@@ -1,0 +1,440 @@
+{
+  "entities": {
+    "UserWorkspace": {
+      "title": "UserWorkspace",
+      "description": "Root workspace document anchoring a merchant's authenticated session in Firestore.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "displayName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "photoURL": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "email", "displayName", "createdAt", "updatedAt"]
+    },
+    "MerchantProfileDoc": {
+      "title": "MerchantProfileDoc",
+      "description": "Private shop configuration, Mobile Money accounts, delivery rates, and TVA tax settings.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "storeName": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "storeSlug": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "phone": { "type": "string", "maxLength": 40 },
+        "whatsapp": { "type": "string", "maxLength": 40 },
+        "email": { "type": "string", "maxLength": 160 },
+        "address": { "type": "string", "maxLength": 300 },
+        "city": { "type": "string", "maxLength": 100 },
+        "ifuNumber": { "type": "string", "maxLength": 40 },
+        "currency": { "type": "string", "enum": ["FCFA", "EUR", "USD"] },
+        "description": { "type": "string", "maxLength": 1000 },
+        "logo": { "type": "string", "maxLength": 150000 },
+        "banner": { "type": "string", "maxLength": 150000 },
+        "momoNumber": { "type": "string", "maxLength": 40 },
+        "moovNumber": { "type": "string", "maxLength": 40 },
+        "celtiisNumber": { "type": "string", "maxLength": 40 },
+        "enabledPaymentMethods": { "type": "array" },
+        "bankAccount": { "type": "string", "maxLength": 120 },
+        "momoMerchantCode": { "type": "string", "maxLength": 60 },
+        "paymentInstructions": { "type": "string", "maxLength": 500 },
+        "deliveryRates": { "type": "object" },
+        "enableOnlineOrders": { "type": "boolean" },
+        "enableWhatsAppCheckout": { "type": "boolean" },
+        "taxEnabled": { "type": "boolean" },
+        "taxRate": { "type": "number" },
+        "taxLabel": { "type": "string", "maxLength": 60 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerId", "name", "storeName", "storeSlug", "phone", "whatsapp",
+        "email", "address", "city", "ifuNumber", "currency", "description",
+        "logo", "banner", "momoNumber", "moovNumber", "celtiisNumber",
+        "deliveryRates", "enableOnlineOrders", "enableWhatsAppCheckout",
+        "taxEnabled", "taxRate", "createdAt", "updatedAt"
+      ]
+    },
+    "ProductDoc": {
+      "title": "ProductDoc",
+      "description": "Catalog product with pricing, stock level, barcode, and optional variants.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "category": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "sku": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "barcode": { "type": "string", "maxLength": 64 },
+        "buyPrice": { "type": "number" },
+        "sellPrice": { "type": "number" },
+        "stock": { "type": "number" },
+        "minStockAlert": { "type": "number" },
+        "description": { "type": "string", "maxLength": 1500 },
+        "image": { "type": "string", "maxLength": 300000 },
+        "isOnline": { "type": "boolean" },
+        "totalSold": { "type": "number" },
+        "unit": { "type": "string", "maxLength": 40 },
+        "variants": { "type": "array" },
+        "imageVerification": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerId", "id", "name", "category", "sku", "buyPrice", "sellPrice",
+        "stock", "minStockAlert", "description", "image", "isOnline",
+        "totalSold", "unit", "createdAt", "updatedAt"
+      ]
+    },
+    "OrderDoc": {
+      "title": "OrderDoc",
+      "description": "Customer order from storefront, WhatsApp, POS, or converted quote.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "orderNumber": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "customerName": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "customerPhone": { "type": "string", "maxLength": 40 },
+        "deliveryCity": { "type": "string", "maxLength": 120 },
+        "deliveryAddress": { "type": "string", "maxLength": 300 },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "taxRate": { "type": "number" },
+        "taxLabel": { "type": "string", "maxLength": 60 },
+        "taxAmount": { "type": "number" },
+        "deliveryFee": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["MTN_MOMO", "MOOV_MONEY", "CELTIIS_CASH", "CASH_ON_DELIVERY", "CARTE_BANCAIRE"] },
+        "paymentStatus": { "type": "string", "enum": ["UNPAID", "PARTIAL", "PAID", "REFUNDED"] },
+        "amountPaid": { "type": "number" },
+        "paymentReference": { "type": "string", "maxLength": 120 },
+        "paymentConfirmedAt": { "type": "string", "maxLength": 40 },
+        "status": { "type": "string", "enum": ["PENDING", "PAID", "SHIPPED", "DELIVERED", "CANCELLED"] },
+        "date": { "type": "string", "maxLength": 40 },
+        "channel": { "type": "string", "enum": ["STORE_FRONT", "POS", "WHATSAPP"] },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerId", "id", "orderNumber", "customerName", "customerPhone",
+        "deliveryCity", "deliveryAddress", "items", "subtotal", "deliveryFee",
+        "totalAmount", "paymentMethod", "status", "date", "channel",
+        "createdAt", "updatedAt"
+      ]
+    },
+    "QuoteDoc": {
+      "title": "QuoteDoc",
+      "description": "Customer proforma quote convertible into a confirmed order once accepted.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "quoteNumber": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "customerId": { "type": "string", "maxLength": 128 },
+        "customerName": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "customerPhone": { "type": "string", "maxLength": 40 },
+        "deliveryCity": { "type": "string", "maxLength": 120 },
+        "deliveryAddress": { "type": "string", "maxLength": 300 },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "discountAmount": { "type": "number" },
+        "taxRate": { "type": "number" },
+        "taxLabel": { "type": "string", "maxLength": 60 },
+        "taxAmount": { "type": "number" },
+        "deliveryFee": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["DRAFT", "SENT", "ACCEPTED", "CONVERTED", "REJECTED", "EXPIRED"] },
+        "validUntil": { "type": "string", "maxLength": 40 },
+        "createdAtDate": { "type": "string", "maxLength": 40 },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "convertedOrderId": { "type": "string", "maxLength": 128 },
+        "convertedOrderNumber": { "type": "string", "maxLength": 64 },
+        "preferredPaymentMethod": { "type": "string", "enum": ["MTN_MOMO", "MOOV_MONEY", "CELTIIS_CASH", "CASH_ON_DELIVERY", "CARTE_BANCAIRE"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerId", "id", "quoteNumber", "customerName", "customerPhone",
+        "deliveryCity", "deliveryAddress", "items", "subtotal", "discountAmount",
+        "taxRate", "taxLabel", "taxAmount", "deliveryFee", "totalAmount",
+        "status", "validUntil", "createdAtDate", "preferredPaymentMethod",
+        "createdAt", "updatedAt"
+      ]
+    },
+    "CustomerDoc": {
+      "title": "CustomerDoc",
+      "description": "CRM customer profile with contact PII and loyalty notes.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "phone": { "type": "string", "maxLength": 40 },
+        "city": { "type": "string", "maxLength": 120 },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "createdAtDate": { "type": "string", "maxLength": 40 },
+        "lastPromoSentAt": { "type": "string", "maxLength": 40 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "id", "name", "phone", "createdAtDate", "createdAt", "updatedAt"]
+    },
+    "PromoLogDoc": {
+      "title": "PromoLogDoc",
+      "description": "Promotional broadcast log sent via WhatsApp or SMS.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "message": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "channel": { "type": "string", "enum": ["WHATSAPP", "SMS"] },
+        "recipientCount": { "type": "number" },
+        "recipientNames": { "type": "array" },
+        "sentAt": { "type": "string", "maxLength": 40 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerId", "id", "title", "message", "channel", "recipientCount",
+        "recipientNames", "sentAt", "createdAt", "updatedAt"
+      ]
+    },
+    "StockMovementDoc": {
+      "title": "StockMovementDoc",
+      "description": "Inventory IN/OUT/ADJUSTMENT entry optionally linked to a supplier.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "productId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "productName": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "type": { "type": "string", "enum": ["IN", "OUT", "ADJUSTMENT"] },
+        "quantity": { "type": "number" },
+        "reason": { "type": "string", "maxLength": 300 },
+        "date": { "type": "string", "maxLength": 40 },
+        "user": { "type": "string", "maxLength": 120 },
+        "supplierId": { "type": "string", "maxLength": 128 },
+        "supplierName": { "type": "string", "maxLength": 160 },
+        "unitCost": { "type": "number" },
+        "totalCost": { "type": "number" },
+        "amountPaid": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerId", "id", "productId", "productName", "type",
+        "quantity", "reason", "date", "user", "createdAt", "updatedAt"
+      ]
+    },
+    "SupplierDoc": {
+      "title": "SupplierDoc",
+      "description": "Supplier contact record linked to incoming stock movements.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "contactPerson": { "type": "string", "maxLength": 120 },
+        "phone": { "type": "string", "maxLength": 40 },
+        "city": { "type": "string", "maxLength": 120 },
+        "category": { "type": "string", "maxLength": 80 },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "createdAtDate": { "type": "string", "maxLength": 40 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "id", "name", "phone", "city", "category", "createdAtDate", "createdAt", "updatedAt"]
+    },
+    "SupplierPaymentDoc": {
+      "title": "SupplierPaymentDoc",
+      "description": "Payment settlement recorded against a supplier unpaid balance.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "supplierId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "amount": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["ESPECES", "MTN_MOMO", "MOOV_MONEY", "VIREMENT"] },
+        "reference": { "type": "string", "maxLength": 120 },
+        "notes": { "type": "string", "maxLength": 500 },
+        "date": { "type": "string", "maxLength": 40 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "id", "supplierId", "amount", "paymentMethod", "date", "createdAt", "updatedAt"]
+    },
+    "SellerPayoutDoc": {
+      "title": "SellerPayoutDoc",
+      "description": "Seller treasury withdrawal or bank deposit from a collected payment channel.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "amount": { "type": "number" },
+        "sourceMethod": { "type": "string", "enum": ["MTN_MOMO", "MOOV_MONEY", "CELTIIS_CASH", "CASH_ON_DELIVERY", "CARTE_BANCAIRE"] },
+        "destinationType": { "type": "string", "enum": ["BANQUE", "MOMO_PERSO", "CAISSE_COFFRE"] },
+        "destinationAccount": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "reference": { "type": "string", "maxLength": 120 },
+        "notes": { "type": "string", "maxLength": 500 },
+        "date": { "type": "string", "maxLength": 40 },
+        "status": { "type": "string", "enum": ["COMPLETED", "PENDING"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "id", "amount", "sourceMethod", "destinationType", "destinationAccount", "date", "status", "createdAt", "updatedAt"]
+    },
+    "PublicStoreDoc": {
+      "title": "PublicStoreDoc",
+      "description": "Public storefront projection keyed by storeSlug for unauthenticated visitors (strictly excludes merchant email and IFU PII).",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "storeSlug": { "type": "string", "minLength": 1, "maxLength": 100, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "storeName": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "phone": { "type": "string", "maxLength": 40 },
+        "whatsapp": { "type": "string", "maxLength": 40 },
+        "address": { "type": "string", "maxLength": 300 },
+        "city": { "type": "string", "maxLength": 100 },
+        "currency": { "type": "string", "enum": ["FCFA", "EUR", "USD"] },
+        "description": { "type": "string", "maxLength": 1000 },
+        "logo": { "type": "string", "maxLength": 150000 },
+        "banner": { "type": "string", "maxLength": 150000 },
+        "momoNumber": { "type": "string", "maxLength": 40 },
+        "moovNumber": { "type": "string", "maxLength": 40 },
+        "celtiisNumber": { "type": "string", "maxLength": 40 },
+        "enabledPaymentMethods": { "type": "array" },
+        "bankAccount": { "type": "string", "maxLength": 120 },
+        "momoMerchantCode": { "type": "string", "maxLength": 60 },
+        "paymentInstructions": { "type": "string", "maxLength": 500 },
+        "deliveryRates": { "type": "object" },
+        "enableOnlineOrders": { "type": "boolean" },
+        "enableWhatsAppCheckout": { "type": "boolean" },
+        "taxEnabled": { "type": "boolean" },
+        "taxRate": { "type": "number" },
+        "taxLabel": { "type": "string", "maxLength": 60 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerId", "storeSlug", "name", "storeName", "phone", "whatsapp",
+        "address", "city", "currency", "description", "logo", "banner",
+        "momoNumber", "moovNumber", "celtiisNumber", "deliveryRates",
+        "enableOnlineOrders", "enableWhatsAppCheckout", "taxEnabled",
+        "taxRate", "createdAt", "updatedAt"
+      ]
+    },
+    "PublicProductDoc": {
+      "title": "PublicProductDoc",
+      "description": "Public storefront product projection (excludes buyPrice and internal SKU).",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "storeSlug": { "type": "string", "minLength": 1, "maxLength": 100, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "category": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "sellPrice": { "type": "number" },
+        "stock": { "type": "number" },
+        "description": { "type": "string", "maxLength": 1500 },
+        "image": { "type": "string", "maxLength": 300000 },
+        "isOnline": { "type": "boolean" },
+        "totalSold": { "type": "number" },
+        "unit": { "type": "string", "maxLength": 40 },
+        "variants": { "type": "array" },
+        "imageVerification": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerId", "id", "storeSlug", "name", "category", "sellPrice",
+        "stock", "description", "image", "isOnline", "totalSold",
+        "unit", "createdAt", "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserWorkspace" },
+      "description": "Root workspace document per authenticated Google merchant user."
+    },
+    "/users/{userId}/profile/{docId}": {
+      "schema": { "$ref": "#/entities/MerchantProfileDoc" },
+      "description": "Merchant shop profile, Mobile Money numbers, payment channels, delivery fees, and tax config."
+    },
+    "/users/{userId}/products/{productId}": {
+      "schema": { "$ref": "#/entities/ProductDoc" },
+      "description": "Merchant product catalog items."
+    },
+    "/users/{userId}/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/OrderDoc" },
+      "description": "Confirmed customer orders and payment verification details."
+    },
+    "/users/{userId}/quotes/{quoteId}": {
+      "schema": { "$ref": "#/entities/QuoteDoc" },
+      "description": "Customer proforma quotes convertible into orders."
+    },
+    "/users/{userId}/customers/{customerId}": {
+      "schema": { "$ref": "#/entities/CustomerDoc" },
+      "description": "Customer CRM directory (isolated PII per owner)."
+    },
+    "/users/{userId}/promoLogs/{logId}": {
+      "schema": { "$ref": "#/entities/PromoLogDoc" },
+      "description": "Promotional campaign history logs."
+    },
+    "/users/{userId}/stockMovements/{movementId}": {
+      "schema": { "$ref": "#/entities/StockMovementDoc" },
+      "description": "Stock movement entries (IN/OUT/ADJUSTMENT) linked to suppliers."
+    },
+    "/users/{userId}/suppliers/{supplierId}": {
+      "schema": { "$ref": "#/entities/SupplierDoc" },
+      "description": "Merchant supplier directory."
+    },
+    "/users/{userId}/supplierPayments/{paymentId}": {
+      "schema": { "$ref": "#/entities/SupplierPaymentDoc" },
+      "description": "Payments made toward supplier unpaid balances."
+    },
+    "/users/{userId}/sellerPayouts/{payoutId}": {
+      "schema": { "$ref": "#/entities/SellerPayoutDoc" },
+      "description": "Seller treasury withdrawals, bank transfers, and cash safe deposits."
+    },
+    "/publicStores/{storeSlug}": {
+      "schema": { "$ref": "#/entities/PublicStoreDoc" },
+      "description": "Public storefront configuration readable by direct slug lookup (no directory listing)."
+    },
+    "/publicStores/{storeSlug}/products/{productId}": {
+      "schema": { "$ref": "#/entities/PublicProductDoc" },
+      "description": "Public online catalog products for ?shop={storeSlug} visitors."
+    }
+  }
+}

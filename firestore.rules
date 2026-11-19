@@ -1,0 +1,804 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global Safety Net (Default-Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Hardened Global Helpers
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isVerifiedUser() && request.auth.uid == userId;
+    }
+
+    function hasParentWorkspace(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId));
+    }
+
+    function isValidString(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    function isValidNumber(val, minVal, maxVal) {
+      return (val is int || val is float) && val >= minVal && val <= maxVal;
+    }
+
+    // 3. Entity Validation Blueprints (Anti-Update-Gap)
+
+    function isValidUserWorkspace(data, userId) {
+      return data.keys().hasAll(['ownerId', 'email', 'displayName', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'email', 'displayName', 'photoURL', 'createdAt', 'updatedAt'])
+        && data.ownerId == request.auth.uid
+        && data.ownerId == userId
+        && isValidString(data.email, 3, 200)
+        && isValidString(data.displayName, 1, 120)
+        && (!('photoURL' in data) || isValidString(data.photoURL, 0, 500))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMerchantProfile(data, userId) {
+      return data.keys().hasAll([
+        'ownerId', 'name', 'storeName', 'storeSlug', 'phone', 'whatsapp',
+        'email', 'address', 'city', 'ifuNumber', 'currency', 'description',
+        'logo', 'banner', 'momoNumber', 'moovNumber', 'celtiisNumber',
+        'deliveryRates', 'enableOnlineOrders', 'enableWhatsAppCheckout',
+        'taxEnabled', 'taxRate', 'createdAt', 'updatedAt'
+      ])
+        && data.keys().hasOnly([
+          'ownerId', 'name', 'storeName', 'storeSlug', 'phone', 'whatsapp',
+          'email', 'address', 'city', 'ifuNumber', 'currency', 'description',
+          'logo', 'banner', 'momoNumber', 'moovNumber', 'celtiisNumber',
+          'enabledPaymentMethods', 'bankAccount', 'momoMerchantCode', 'paymentInstructions',
+          'deliveryRates', 'enableOnlineOrders', 'enableWhatsAppCheckout',
+          'taxEnabled', 'taxRate', 'taxLabel', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && data.ownerId == userId
+        && isValidString(data.name, 1, 120)
+        && isValidString(data.storeName, 1, 160)
+        && isValidString(data.storeSlug, 1, 100)
+        && isValidString(data.phone, 0, 40)
+        && isValidString(data.whatsapp, 0, 40)
+        && isValidString(data.email, 0, 160)
+        && isValidString(data.address, 0, 300)
+        && isValidString(data.city, 0, 100)
+        && isValidString(data.ifuNumber, 0, 40)
+        && data.currency in ['FCFA', 'EUR', 'USD']
+        && isValidString(data.description, 0, 1000)
+        && isValidString(data.logo, 0, 150000)
+        && isValidString(data.banner, 0, 150000)
+        && isValidString(data.momoNumber, 0, 40)
+        && isValidString(data.moovNumber, 0, 40)
+        && isValidString(data.celtiisNumber, 0, 40)
+        && (!('enabledPaymentMethods' in data) || (data.enabledPaymentMethods is list && data.enabledPaymentMethods.size() >= 1 && data.enabledPaymentMethods.size() <= 5 && data.enabledPaymentMethods[0] is string))
+        && (!('bankAccount' in data) || isValidString(data.bankAccount, 0, 120))
+        && (!('momoMerchantCode' in data) || isValidString(data.momoMerchantCode, 0, 60))
+        && (!('paymentInstructions' in data) || isValidString(data.paymentInstructions, 0, 500))
+        && data.deliveryRates is map
+        && data.deliveryRates.keys().hasAll(['cotonou', 'calavi', 'portoNovo', 'interieur'])
+        && data.deliveryRates.keys().hasOnly(['cotonou', 'calavi', 'portoNovo', 'interieur'])
+        && isValidNumber(data.deliveryRates.cotonou, 0, 1000000)
+        && isValidNumber(data.deliveryRates.calavi, 0, 1000000)
+        && isValidNumber(data.deliveryRates.portoNovo, 0, 1000000)
+        && isValidNumber(data.deliveryRates.interieur, 0, 1000000)
+        && data.enableOnlineOrders is bool
+        && data.enableWhatsAppCheckout is bool
+        && data.taxEnabled is bool
+        && isValidNumber(data.taxRate, 0, 100)
+        && (!('taxLabel' in data) || isValidString(data.taxLabel, 0, 60))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidProduct(data, userId) {
+      return data.keys().hasAll([
+        'ownerId', 'id', 'name', 'category', 'sku', 'buyPrice', 'sellPrice',
+        'stock', 'minStockAlert', 'description', 'image', 'isOnline',
+        'totalSold', 'unit', 'createdAt', 'updatedAt'
+      ])
+        && data.keys().hasOnly([
+          'ownerId', 'id', 'name', 'category', 'sku', 'barcode', 'buyPrice',
+          'sellPrice', 'stock', 'minStockAlert', 'description', 'image',
+          'isOnline', 'totalSold', 'unit', 'variants', 'imageVerification',
+          'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && data.ownerId == userId
+        && isValidId(data.id)
+        && isValidString(data.name, 1, 200)
+        && isValidString(data.category, 1, 80)
+        && isValidString(data.sku, 1, 64)
+        && (!('barcode' in data) || isValidString(data.barcode, 0, 64))
+        && isValidNumber(data.buyPrice, 0, 100000000)
+        && isValidNumber(data.sellPrice, 0, 100000000)
+        && isValidNumber(data.stock, 0, 1000000)
+        && isValidNumber(data.minStockAlert, 0, 100000)
+        && isValidString(data.description, 0, 1500)
+        && isValidString(data.image, 0, 300000)
+        && data.isOnline is bool
+        && isValidNumber(data.totalSold, 0, 10000000)
+        && isValidString(data.unit, 1, 40)
+        && (!('variants' in data) || (data.variants is list && data.variants.size() <= 30 && (data.variants.size() == 0 || data.variants[0] is map)))
+        && (!('imageVerification' in data) || data.imageVerification is map)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidOrder(data, userId) {
+      return data.keys().hasAll([
+        'ownerId', 'id', 'orderNumber', 'customerName', 'customerPhone',
+        'deliveryCity', 'deliveryAddress', 'items', 'subtotal', 'deliveryFee',
+        'totalAmount', 'paymentMethod', 'status', 'date', 'channel',
+        'createdAt', 'updatedAt'
+      ])
+        && data.keys().hasOnly([
+          'ownerId', 'id', 'orderNumber', 'customerName', 'customerPhone',
+          'deliveryCity', 'deliveryAddress', 'items', 'subtotal', 'taxRate',
+          'taxLabel', 'taxAmount', 'deliveryFee', 'totalAmount',
+          'paymentMethod', 'paymentStatus', 'amountPaid', 'paymentReference',
+          'paymentConfirmedAt', 'status', 'date', 'channel', 'notes',
+          'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && data.ownerId == userId
+        && isValidId(data.id)
+        && isValidString(data.orderNumber, 1, 64)
+        && isValidString(data.customerName, 1, 160)
+        && isValidString(data.customerPhone, 0, 40)
+        && isValidString(data.deliveryCity, 0, 120)
+        && isValidString(data.deliveryAddress, 0, 300)
+        && data.items is list
+        && data.items.size() >= 1
+        && data.items.size() <= 100
+        && data.items[0] is map
+        && isValidNumber(data.subtotal, 0, 1000000000)
+        && (!('taxRate' in data) || isValidNumber(data.taxRate, 0, 100))
+        && (!('taxLabel' in data) || isValidString(data.taxLabel, 0, 60))
+        && (!('taxAmount' in data) || isValidNumber(data.taxAmount, 0, 1000000000))
+        && isValidNumber(data.deliveryFee, 0, 10000000)
+        && isValidNumber(data.totalAmount, 0, 1000000000)
+        && data.paymentMethod in ['MTN_MOMO', 'MOOV_MONEY', 'CELTIIS_CASH', 'CASH_ON_DELIVERY', 'CARTE_BANCAIRE']
+        && (!('paymentStatus' in data) || data.paymentStatus in ['UNPAID', 'PARTIAL', 'PAID', 'REFUNDED'])
+        && (!('amountPaid' in data) || isValidNumber(data.amountPaid, 0, 1000000000))
+        && (!('paymentReference' in data) || isValidString(data.paymentReference, 0, 120))
+        && (!('paymentConfirmedAt' in data) || isValidString(data.paymentConfirmedAt, 0, 40))
+        && data.status in ['PENDING', 'PAID', 'SHIPPED', 'DELIVERED', 'CANCELLED']
+        && isValidString(data.date, 4, 40)
+        && data.channel in ['STORE_FRONT', 'POS', 'WHATSAPP']
+        && (!('notes' in data) || isValidString(data.notes, 0, 1000))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidQuote(data, userId) {
+      return data.keys().hasAll([
+        'ownerId', 'id', 'quoteNumber', 'customerName', 'customerPhone',
+        'deliveryCity', 'deliveryAddress', 'items', 'subtotal', 'discountAmount',
+        'taxRate', 'taxLabel', 'taxAmount', 'deliveryFee', 'totalAmount',
+        'status', 'validUntil', 'createdAtDate', 'preferredPaymentMethod',
+        'createdAt', 'updatedAt'
+      ])
+        && data.keys().hasOnly([
+          'ownerId', 'id', 'quoteNumber', 'customerId', 'customerName',
+          'customerPhone', 'deliveryCity', 'deliveryAddress', 'items',
+          'subtotal', 'discountAmount', 'taxRate', 'taxLabel', 'taxAmount',
+          'deliveryFee', 'totalAmount', 'status', 'validUntil', 'createdAtDate',
+          'notes', 'convertedOrderId', 'convertedOrderNumber',
+          'preferredPaymentMethod', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && data.ownerId == userId
+        && isValidId(data.id)
+        && isValidString(data.quoteNumber, 1, 64)
+        && (!('customerId' in data) || isValidString(data.customerId, 0, 128))
+        && isValidString(data.customerName, 1, 160)
+        && isValidString(data.customerPhone, 0, 40)
+        && isValidString(data.deliveryCity, 0, 120)
+        && isValidString(data.deliveryAddress, 0, 300)
+        && data.items is list
+        && data.items.size() >= 1
+        && data.items.size() <= 100
+        && data.items[0] is map
+        && isValidNumber(data.subtotal, 0, 1000000000)
+        && isValidNumber(data.discountAmount, 0, 1000000000)
+        && isValidNumber(data.taxRate, 0, 100)
+        && isValidString(data.taxLabel, 0, 60)
+        && isValidNumber(data.taxAmount, 0, 1000000000)
+        && isValidNumber(data.deliveryFee, 0, 10000000)
+        && isValidNumber(data.totalAmount, 0, 1000000000)
+        && data.status in ['DRAFT', 'SENT', 'ACCEPTED', 'CONVERTED', 'REJECTED', 'EXPIRED']
+        && isValidString(data.validUntil, 4, 40)
+        && isValidString(data.createdAtDate, 4, 40)
+        && (!('notes' in data) || isValidString(data.notes, 0, 1000))
+        && (!('convertedOrderId' in data) || isValidId(data.convertedOrderId))
+        && (!('convertedOrderNumber' in data) || isValidString(data.convertedOrderNumber, 1, 64))
+        && data.preferredPaymentMethod in ['MTN_MOMO', 'MOOV_MONEY', 'CELTIIS_CASH', 'CASH_ON_DELIVERY', 'CARTE_BANCAIRE']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidCustomer(data, userId) {
+      return data.keys().hasAll(['ownerId', 'id', 'name', 'phone', 'createdAtDate', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly([
+          'ownerId', 'id', 'name', 'phone', 'city', 'notes',
+          'createdAtDate', 'lastPromoSentAt', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && data.ownerId == userId
+        && isValidId(data.id)
+        && isValidString(data.name, 1, 160)
+        && isValidString(data.phone, 0, 40)
+        && (!('city' in data) || isValidString(data.city, 0, 120))
+        && (!('notes' in data) || isValidString(data.notes, 0, 1000))
+        && isValidString(data.createdAtDate, 4, 40)
+        && (!('lastPromoSentAt' in data) || isValidString(data.lastPromoSentAt, 0, 40))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPromoLog(data, userId) {
+      return data.keys().hasAll([
+        'ownerId', 'id', 'title', 'message', 'channel', 'recipientCount',
+        'recipientNames', 'sentAt', 'createdAt', 'updatedAt'
+      ])
+        && data.keys().hasOnly([
+          'ownerId', 'id', 'title', 'message', 'channel', 'recipientCount',
+          'recipientNames', 'sentAt', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && data.ownerId == userId
+        && isValidId(data.id)
+        && isValidString(data.title, 1, 160)
+        && isValidString(data.message, 1, 2000)
+        && data.channel in ['WHATSAPP', 'SMS']
+        && isValidNumber(data.recipientCount, 0, 10000)
+        && data.recipientNames is list
+        && data.recipientNames.size() <= 200
+        && (data.recipientNames.size() == 0 || data.recipientNames[0] is string)
+        && isValidString(data.sentAt, 4, 40)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidStockMovement(data, userId) {
+      return data.keys().hasAll([
+        'ownerId', 'id', 'productId', 'productName', 'type',
+        'quantity', 'reason', 'date', 'user', 'createdAt', 'updatedAt'
+      ])
+        && data.keys().hasOnly([
+          'ownerId', 'id', 'productId', 'productName', 'type',
+          'quantity', 'reason', 'date', 'user', 'supplierId',
+          'supplierName', 'unitCost', 'totalCost', 'amountPaid',
+          'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && data.ownerId == userId
+        && isValidId(data.id)
+        && isValidString(data.productId, 1, 128)
+        && isValidString(data.productName, 1, 200)
+        && data.type in ['IN', 'OUT', 'ADJUSTMENT']
+        && isValidNumber(data.quantity, 0, 1000000)
+        && isValidString(data.reason, 0, 300)
+        && isValidString(data.date, 4, 40)
+        && isValidString(data.user, 1, 120)
+        && (!('supplierId' in data) || isValidString(data.supplierId, 0, 128))
+        && (!('supplierName' in data) || isValidString(data.supplierName, 0, 160))
+        && (!('unitCost' in data) || isValidNumber(data.unitCost, 0, 100000000))
+        && (!('totalCost' in data) || isValidNumber(data.totalCost, 0, 1000000000))
+        && (!('amountPaid' in data) || isValidNumber(data.amountPaid, 0, 1000000000))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidSupplier(data, userId) {
+      return data.keys().hasAll(['ownerId', 'id', 'name', 'phone', 'city', 'category', 'createdAtDate', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly([
+          'ownerId', 'id', 'name', 'contactPerson', 'phone', 'city',
+          'category', 'notes', 'createdAtDate', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && data.ownerId == userId
+        && isValidId(data.id)
+        && isValidString(data.name, 1, 160)
+        && (!('contactPerson' in data) || isValidString(data.contactPerson, 0, 120))
+        && isValidString(data.phone, 0, 40)
+        && isValidString(data.city, 0, 120)
+        && isValidString(data.category, 0, 80)
+        && (!('notes' in data) || isValidString(data.notes, 0, 1000))
+        && isValidString(data.createdAtDate, 4, 40)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidSupplierPayment(data, userId) {
+      return data.keys().hasAll(['ownerId', 'id', 'supplierId', 'amount', 'paymentMethod', 'date', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly([
+          'ownerId', 'id', 'supplierId', 'amount', 'paymentMethod',
+          'reference', 'notes', 'date', 'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && data.ownerId == userId
+        && isValidId(data.id)
+        && isValidId(data.supplierId)
+        && isValidNumber(data.amount, 1, 1000000000)
+        && data.paymentMethod in ['ESPECES', 'MTN_MOMO', 'MOOV_MONEY', 'VIREMENT']
+        && (!('reference' in data) || isValidString(data.reference, 0, 120))
+        && (!('notes' in data) || isValidString(data.notes, 0, 500))
+        && isValidString(data.date, 4, 40)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidSellerPayout(data, userId) {
+      return data.keys().hasAll([
+        'ownerId', 'id', 'amount', 'sourceMethod', 'destinationType',
+        'destinationAccount', 'date', 'status', 'createdAt', 'updatedAt'
+      ])
+        && data.keys().hasOnly([
+          'ownerId', 'id', 'amount', 'sourceMethod', 'destinationType',
+          'destinationAccount', 'reference', 'notes', 'date', 'status',
+          'createdAt', 'updatedAt'
+        ])
+        && data.ownerId == request.auth.uid
+        && data.ownerId == userId
+        && isValidId(data.id)
+        && isValidNumber(data.amount, 1, 1000000000)
+        && data.sourceMethod in ['MTN_MOMO', 'MOOV_MONEY', 'CELTIIS_CASH', 'CASH_ON_DELIVERY', 'CARTE_BANCAIRE']
+        && data.destinationType in ['BANQUE', 'MOMO_PERSO', 'CAISSE_COFFRE']
+        && isValidString(data.destinationAccount, 1, 160)
+        && (!('reference' in data) || isValidString(data.reference, 0, 120))
+        && (!('notes' in data) || isValidString(data.notes, 0, 500))
+        && isValidString(data.date, 4, 40)
+        && data.status in ['COMPLETED', 'PENDING']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPublicStore(data, storeSlug) {
+      return data.keys().hasAll([
+        'ownerId', 'storeSlug', 'name', 'storeName', 'phone', 'whatsapp',
+        'address', 'city', 'currency', 'description', 'logo', 'banner',
+        'momoNumber', 'moovNumber', 'celtiisNumber', 'deliveryRates',
+        'enableOnlineOrders', 'enableWhatsAppCheckout', 'taxEnabled',
+        'taxRate', 'createdAt', 'updatedAt'
+      ])
+        && data.keys().hasOnly([
+          'ownerId', 'storeSlug', 'name', 'storeName', 'phone', 'whatsapp',
+          'address', 'city', 'currency', 'description', 'logo', 'banner',
+          'momoNumber', 'moovNumber', 'celtiisNumber', 'enabledPaymentMethods',
+          'bankAccount', 'momoMerchantCode', 'paymentInstructions',
+          'deliveryRates', 'enableOnlineOrders', 'enableWhatsAppCheckout',
+          'taxEnabled', 'taxRate', 'taxLabel', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.ownerId)
+        && data.storeSlug == storeSlug
+        && isValidId(data.storeSlug)
+        && isValidString(data.name, 1, 120)
+        && isValidString(data.storeName, 1, 160)
+        && isValidString(data.phone, 0, 40)
+        && isValidString(data.whatsapp, 0, 40)
+        && isValidString(data.address, 0, 300)
+        && isValidString(data.city, 0, 100)
+        && data.currency in ['FCFA', 'EUR', 'USD']
+        && isValidString(data.description, 0, 1000)
+        && isValidString(data.logo, 0, 150000)
+        && isValidString(data.banner, 0, 150000)
+        && isValidString(data.momoNumber, 0, 40)
+        && isValidString(data.moovNumber, 0, 40)
+        && isValidString(data.celtiisNumber, 0, 40)
+        && (!('enabledPaymentMethods' in data) || (data.enabledPaymentMethods is list && data.enabledPaymentMethods.size() >= 1 && data.enabledPaymentMethods.size() <= 5 && data.enabledPaymentMethods[0] is string))
+        && (!('bankAccount' in data) || isValidString(data.bankAccount, 0, 120))
+        && (!('momoMerchantCode' in data) || isValidString(data.momoMerchantCode, 0, 60))
+        && (!('paymentInstructions' in data) || isValidString(data.paymentInstructions, 0, 500))
+        && data.deliveryRates is map
+        && data.deliveryRates.keys().hasAll(['cotonou', 'calavi', 'portoNovo', 'interieur'])
+        && data.deliveryRates.keys().hasOnly(['cotonou', 'calavi', 'portoNovo', 'interieur'])
+        && isValidNumber(data.deliveryRates.cotonou, 0, 1000000)
+        && isValidNumber(data.deliveryRates.calavi, 0, 1000000)
+        && isValidNumber(data.deliveryRates.portoNovo, 0, 1000000)
+        && isValidNumber(data.deliveryRates.interieur, 0, 1000000)
+        && data.enableOnlineOrders is bool
+        && data.enableWhatsAppCheckout is bool
+        && data.taxEnabled is bool
+        && isValidNumber(data.taxRate, 0, 100)
+        && (!('taxLabel' in data) || isValidString(data.taxLabel, 0, 60))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPublicProduct(data, storeSlug, productId) {
+      return data.keys().hasAll([
+        'ownerId', 'id', 'storeSlug', 'name', 'category', 'sellPrice',
+        'stock', 'description', 'image', 'isOnline', 'totalSold',
+        'unit', 'createdAt', 'updatedAt'
+      ])
+        && data.keys().hasOnly([
+          'ownerId', 'id', 'storeSlug', 'name', 'category', 'sellPrice',
+          'stock', 'description', 'image', 'isOnline', 'totalSold',
+          'unit', 'variants', 'imageVerification', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.ownerId)
+        && data.id == productId
+        && isValidId(data.id)
+        && data.storeSlug == storeSlug
+        && isValidId(data.storeSlug)
+        && isValidString(data.name, 1, 200)
+        && isValidString(data.category, 1, 80)
+        && isValidNumber(data.sellPrice, 0, 100000000)
+        && isValidNumber(data.stock, 0, 1000000)
+        && isValidString(data.description, 0, 1500)
+        && isValidString(data.image, 0, 300000)
+        && data.isOnline is bool
+        && isValidNumber(data.totalSold, 0, 10000000)
+        && isValidString(data.unit, 1, 40)
+        && (!('variants' in data) || (data.variants is list && data.variants.size() <= 30 && (data.variants.size() == 0 || data.variants[0] is map)))
+        && (!('imageVerification' in data) || data.imageVerification is map)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // 4. Collection Rules (Master Gate + Action-Based Updates + PII Isolation)
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId) && existing().ownerId == request.auth.uid;
+      allow list: if false;
+      allow create: if isOwner(userId)
+        && isValidId(userId)
+        && isValidUserWorkspace(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isOwner(userId)
+        && isValidId(userId)
+        && isValidUserWorkspace(incoming(), userId)
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['email', 'displayName', 'photoURL', 'updatedAt']);
+      allow delete: if false;
+
+      match /profile/{docId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(docId) && existing().ownerId == request.auth.uid;
+        allow list: if isOwner(userId) && existing().ownerId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && docId == 'merchant'
+          && isValidMerchantProfile(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && hasParentWorkspace(userId);
+        allow update: if isOwner(userId)
+          && isValidId(userId)
+          && docId == 'merchant'
+          && isValidMerchantProfile(incoming(), userId)
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'name', 'storeName', 'storeSlug', 'phone', 'whatsapp',
+            'email', 'address', 'city', 'ifuNumber', 'currency', 'description',
+            'logo', 'banner', 'momoNumber', 'moovNumber', 'celtiisNumber',
+            'enabledPaymentMethods', 'bankAccount', 'momoMerchantCode', 'paymentInstructions',
+            'deliveryRates', 'enableOnlineOrders', 'enableWhatsAppCheckout',
+            'taxEnabled', 'taxRate', 'taxLabel', 'updatedAt'
+          ]);
+        allow delete: if false;
+      }
+
+      match /products/{productId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(productId) && existing().ownerId == request.auth.uid;
+        allow list: if isOwner(userId) && existing().ownerId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(productId)
+          && incoming().id == productId
+          && isValidProduct(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && hasParentWorkspace(userId);
+        allow update: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(productId)
+          && isValidProduct(incoming(), userId)
+          && incoming().ownerId == existing().ownerId
+          && incoming().id == existing().id
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && (
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'name', 'category', 'sku', 'barcode', 'buyPrice', 'sellPrice',
+              'stock', 'minStockAlert', 'description', 'image', 'isOnline',
+              'totalSold', 'unit', 'variants', 'imageVerification', 'updatedAt'
+            ])
+          );
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(productId) && existing().ownerId == request.auth.uid;
+      }
+
+      match /orders/{orderId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(orderId) && existing().ownerId == request.auth.uid;
+        allow list: if isOwner(userId) && existing().ownerId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(orderId)
+          && incoming().id == orderId
+          && isValidOrder(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && hasParentWorkspace(userId);
+        allow update: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(orderId)
+          && isValidOrder(incoming(), userId)
+          && existing().status != 'CANCELLED'
+          && incoming().ownerId == existing().ownerId
+          && incoming().id == existing().id
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && (
+            // Action: Order status transition
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+            ||
+            // Action: Seller payment verification & collection
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'status', 'paymentStatus', 'paymentReference', 'amountPaid', 'paymentConfirmedAt', 'updatedAt'
+            ])
+          );
+        allow delete: if false;
+      }
+
+      match /quotes/{quoteId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(quoteId) && existing().ownerId == request.auth.uid;
+        allow list: if isOwner(userId) && existing().ownerId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(quoteId)
+          && incoming().id == quoteId
+          && isValidQuote(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && hasParentWorkspace(userId);
+        allow update: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(quoteId)
+          && isValidQuote(incoming(), userId)
+          && existing().status != 'CONVERTED'
+          && incoming().ownerId == existing().ownerId
+          && incoming().id == existing().id
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && (
+            // Action: Edit draft/sent/accepted quote details
+            (
+              incoming().status in ['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED', 'EXPIRED']
+              && incoming().diff(existing()).affectedKeys().hasOnly([
+                'customerId', 'customerName', 'customerPhone', 'deliveryCity',
+                'deliveryAddress', 'items', 'subtotal', 'discountAmount',
+                'taxRate', 'taxLabel', 'taxAmount', 'deliveryFee', 'totalAmount',
+                'status', 'validUntil', 'notes', 'preferredPaymentMethod', 'updatedAt'
+              ])
+            )
+            ||
+            // Action: Quick status update
+            (
+              incoming().status in ['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED', 'EXPIRED']
+              && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+            )
+            ||
+            // Action: Atomic conversion to confirmed order
+            (
+              incoming().status == 'CONVERTED'
+              && 'convertedOrderId' in incoming()
+              && 'convertedOrderNumber' in incoming()
+              && incoming().diff(existing()).affectedKeys().hasOnly([
+                'status', 'convertedOrderId', 'convertedOrderNumber', 'updatedAt'
+              ])
+              && existsAfter(/databases/$(database)/documents/users/$(userId)/orders/$(incoming().convertedOrderId))
+            )
+          );
+        allow delete: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(quoteId)
+          && existing().ownerId == request.auth.uid
+          && existing().status != 'CONVERTED';
+      }
+
+      match /customers/{customerId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(customerId) && existing().ownerId == request.auth.uid;
+        allow list: if isOwner(userId) && existing().ownerId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(customerId)
+          && incoming().id == customerId
+          && isValidCustomer(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && hasParentWorkspace(userId);
+        allow update: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(customerId)
+          && isValidCustomer(incoming(), userId)
+          && incoming().ownerId == existing().ownerId
+          && incoming().id == existing().id
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && (
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'name', 'phone', 'city', 'notes', 'lastPromoSentAt', 'updatedAt'
+            ])
+          );
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(customerId) && existing().ownerId == request.auth.uid;
+      }
+
+      match /promoLogs/{logId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(logId) && existing().ownerId == request.auth.uid;
+        allow list: if isOwner(userId) && existing().ownerId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(logId)
+          && incoming().id == logId
+          && isValidPromoLog(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && hasParentWorkspace(userId);
+        allow update: if false;
+        allow delete: if false;
+      }
+
+      match /stockMovements/{movementId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(movementId) && existing().ownerId == request.auth.uid;
+        allow list: if isOwner(userId) && existing().ownerId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(movementId)
+          && incoming().id == movementId
+          && isValidStockMovement(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && hasParentWorkspace(userId);
+        allow update: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(movementId)
+          && isValidStockMovement(incoming(), userId)
+          && incoming().ownerId == existing().ownerId
+          && incoming().id == existing().id
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['supplierName', 'updatedAt']);
+        allow delete: if false;
+      }
+
+      match /suppliers/{supplierId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(supplierId) && existing().ownerId == request.auth.uid;
+        allow list: if isOwner(userId) && existing().ownerId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(supplierId)
+          && incoming().id == supplierId
+          && isValidSupplier(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && hasParentWorkspace(userId);
+        allow update: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(supplierId)
+          && isValidSupplier(incoming(), userId)
+          && incoming().ownerId == existing().ownerId
+          && incoming().id == existing().id
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'name', 'contactPerson', 'phone', 'city', 'category', 'notes', 'updatedAt'
+          ]);
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(supplierId) && existing().ownerId == request.auth.uid;
+      }
+
+      match /supplierPayments/{paymentId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(paymentId) && existing().ownerId == request.auth.uid;
+        allow list: if isOwner(userId) && existing().ownerId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(paymentId)
+          && incoming().id == paymentId
+          && isValidSupplierPayment(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && hasParentWorkspace(userId)
+          && exists(/databases/$(database)/documents/users/$(userId)/suppliers/$(incoming().supplierId));
+        allow update: if false;
+        allow delete: if false;
+      }
+
+      match /sellerPayouts/{payoutId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(payoutId) && existing().ownerId == request.auth.uid;
+        allow list: if isOwner(userId) && existing().ownerId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(payoutId)
+          && incoming().id == payoutId
+          && isValidSellerPayout(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && hasParentWorkspace(userId);
+        allow update: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(payoutId)
+          && isValidSellerPayout(incoming(), userId)
+          && existing().status != 'COMPLETED'
+          && incoming().ownerId == existing().ownerId
+          && incoming().id == existing().id
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'reference', 'updatedAt']);
+        allow delete: if false;
+      }
+    }
+
+    match /publicStores/{storeSlug} {
+      allow get: if isValidId(storeSlug);
+      allow list: if false;
+      allow create: if isValidId(storeSlug)
+        && isValidPublicStore(incoming(), storeSlug)
+        && isOwner(incoming().ownerId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && hasParentWorkspace(incoming().ownerId);
+      allow update: if isValidId(storeSlug)
+        && isOwner(existing().ownerId)
+        && isValidPublicStore(incoming(), storeSlug)
+        && incoming().ownerId == existing().ownerId
+        && incoming().storeSlug == existing().storeSlug
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time;
+      allow delete: if isValidId(storeSlug) && isOwner(existing().ownerId);
+
+      match /products/{productId} {
+        allow get: if isValidId(storeSlug)
+          && isValidId(productId)
+          && (existing().isOnline == true || isOwner(existing().ownerId));
+        allow list: if resource.data.isOnline == true;
+        allow create: if isValidId(storeSlug)
+          && isValidId(productId)
+          && isValidPublicProduct(incoming(), storeSlug, productId)
+          && isOwner(incoming().ownerId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && exists(/databases/$(database)/documents/publicStores/$(storeSlug))
+          && get(/databases/$(database)/documents/publicStores/$(storeSlug)).data.ownerId == request.auth.uid;
+        allow update: if isValidId(storeSlug)
+          && isValidId(productId)
+          && isOwner(existing().ownerId)
+          && isValidPublicProduct(incoming(), storeSlug, productId)
+          && incoming().ownerId == existing().ownerId
+          && incoming().id == existing().id
+          && incoming().storeSlug == existing().storeSlug
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time;
+        allow delete: if isValidId(storeSlug)
+          && isValidId(productId)
+          && isOwner(existing().ownerId);
+      }
+    }
+  }
+}
